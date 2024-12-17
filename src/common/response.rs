@@ -15,6 +15,9 @@ impl Response {
             message: msg,
         }
     }
+    pub fn get_status(&self) -> StatusCode {
+        self.status
+    }
 }
 
 impl fmt::Display for Response {
