@@ -1,28 +1,40 @@
-use std::{
-    cell::RefCell,
-    rc::Rc,
-    time::{SystemTime, UNIX_EPOCH},
-};
+use std::{env, sync::Arc};
 
-use rand::SeedableRng;
-use rand_pcg::Pcg64;
+use futures::future::join_all;
 
 mod api;
 mod client;
 mod common;
 
-fn main() {
-    let seed = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("Time went backwards")
-        .as_secs() as u64;
+async fn simulate(client_calls: i32, client_retry: i32) {
+    let api = Arc::new(api::API::new(5));
+    let cl = Arc::new(client::Client::new(client_retry, Arc::clone(&api)));
 
-    let rng = Rc::new(RefCell::new(Pcg64::seed_from_u64(seed)));
+    let mut tasks = vec![];
 
-    let mut api = api::API::new(5, rng.clone());
-    let cl = client::Client::new(1, 10, rng.clone());
+    for i in 0..client_calls {
+        tasks.push(cl.get(i));
+    }
 
-    cl.get(1, |r| api.get(r));
+    join_all(tasks).await;
+}
 
-    // println!("{}", response);
+#[tokio::main]
+async fn main() {
+    let args: Vec<String> = env::args().collect();
+
+    let client_calls: i32 = args
+        .get(1)
+        .expect("pass the client calls number")
+        .parse::<i32>()
+        .expect("pass a valid number");
+
+    let client_retry: i32 = args
+        .get(2)
+        .expect("pass the client retry number")
+        .parse::<i32>()
+        .expect("pass a valid number");
+
+    println!("{}_client_calls_{}_retry_ms", client_calls, client_retry);
+    simulate(client_calls, client_retry).await;
 }

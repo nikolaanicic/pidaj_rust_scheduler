@@ -1,56 +1,45 @@
-use rand::Rng;
-use rand_pcg::Pcg64;
 use std::{
-    cell::RefCell,
-    rc::Rc,
-    thread::sleep,
+    sync::Arc,
     time::{self, Instant},
 };
 
-use crate::common::{Request, Response, StatusCode};
+use tokio::time::sleep;
+
+use crate::{
+    api::API,
+    common::{Request, Response, StatusCode},
+};
 
 pub struct Client {
-    min_retry_time: i32,
-    max_retry_time: i32,
-    random_generator: Rc<RefCell<Pcg64>>,
+    client_retry_ms: i32,
+    api: Arc<API>,
 }
 
 impl Client {
-    pub fn new(
-        min_retry_time: i32,
-        max_retry_time: i32,
-        random_generator: Rc<RefCell<Pcg64>>,
-    ) -> Client {
+    pub fn new(client_retry_ms: i32, api: Arc<API>) -> Client {
         Client {
-            min_retry_time: min_retry_time,
-            max_retry_time: max_retry_time,
-            random_generator: random_generator,
+            client_retry_ms: client_retry_ms,
+            api: api,
         }
     }
 
     fn get_retry_time(&self) -> f32 {
-        let mut rng = self.random_generator.borrow_mut();
-
-        return (rng.gen_range(self.min_retry_time..=self.max_retry_time) as f32)
-            * (rng.gen::<f32>());
+        self.client_retry_ms as f32 / 1000.0
     }
 
-    pub fn get<F>(&self, id: i32, ref mut api_get_stub_call: F) -> Response
-    where
-        F: FnMut(&Request) -> Response,
-    {
+    pub async fn get(&self, id: i32) -> Response {
         let request = Request::new(id);
-
+        let retry_time = self.get_retry_time();
         let start = Instant::now();
-        let mut response = api_get_stub_call(&request);
+
+        let mut response = self.api.get(&request).await;
 
         while response.get_status() != StatusCode::OK {
-            sleep(time::Duration::from_secs_f32(self.get_retry_time()));
-            response = api_get_stub_call(&request);
+            sleep(time::Duration::from_secs_f32(retry_time)).await;
+            response = self.api.get(&request).await;
         }
 
-        println!("{}", start.elapsed().as_millis());
-
+        println!("{}", start.elapsed().as_secs_f32());
         response
     }
 }
