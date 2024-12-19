@@ -2,7 +2,7 @@ use core::fmt;
 
 use super::StatusCode;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Response {
     status: StatusCode,
     message: String,
@@ -26,7 +26,7 @@ impl fmt::Display for Response {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "[response status: {} message: {} active conns: {}]",
+            "[status: {} message: {} active conns: {}]",
             self.status, self.message, self.conns
         )
     }

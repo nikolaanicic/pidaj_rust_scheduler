@@ -37,6 +37,8 @@ impl API {
         let max_time = self.max_compute_time;
         let mut rng = self.random_generator.lock().await;
 
+        return 0.250;
+
         return (rng.gen_range(min_time..=max_time) as f32 * rng.gen::<f32>() / 100.0) / 10.0
             * std::cmp::max(active_conns, 1) as f32;
     }
