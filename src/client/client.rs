@@ -3,10 +3,7 @@ use std::{
     time::{self},
 };
 
-use tokio::{
-    task,
-    time::{sleep, Instant},
-};
+use tokio::time::{sleep, Instant};
 
 use crate::{
     api::API,
@@ -42,7 +39,10 @@ impl Client {
         self.scheduler
             .add_task(
                 id,
-                task::spawn(async move { api.get(&Request::new(id)).await }),
+                Box::new(move || {
+                    let a = Arc::clone(&api);
+                    Box::pin(async move { a.get(&Request::new(id)).await })
+                }),
             )
             .await
             .notified()
@@ -53,6 +53,14 @@ impl Client {
                 break res;
             }
         };
+        let mut tries = 1;
+        println!(
+            "{}: {} {} {}",
+            id,
+            response,
+            start.elapsed().as_secs_f32(),
+            tries
+        );
 
         while response.get_status() != StatusCode::OK {
             sleep(time::Duration::from_secs_f32(retry_time)).await;
@@ -61,7 +69,10 @@ impl Client {
             self.scheduler
                 .add_task(
                     id,
-                    task::spawn(async move { api.get(&Request::new(id)).await }),
+                    Box::new(move || {
+                        let a = Arc::clone(&api);
+                        Box::pin(async move { a.get(&Request::new(id)).await })
+                    }),
                 )
                 .await
                 .notified()
@@ -72,8 +83,17 @@ impl Client {
                     break res;
                 }
             };
+            tries += 1;
+
+            println!(
+                "{}: {} {} {}",
+                id,
+                response,
+                start.elapsed().as_secs_f32(),
+                tries
+            );
         }
-        println!("{}: {}", response, start.elapsed().as_secs_f32());
+
         response
     }
 }

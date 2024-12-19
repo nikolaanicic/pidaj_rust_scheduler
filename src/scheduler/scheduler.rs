@@ -1,5 +1,7 @@
 use std::{
     collections::{HashMap, VecDeque},
+    future::Future,
+    pin::Pin,
     sync::Arc,
     time::Duration,
 };
@@ -7,14 +9,19 @@ use std::{
 use tokio::{
     self,
     sync::{Mutex, Notify, Semaphore},
-    task::{self, JoinHandle},
+    task::{self},
     time,
 };
 
 use crate::common::Response;
 
 pub struct Scheduler {
-    task_queue: Mutex<VecDeque<(i32, JoinHandle<Response>)>>,
+    task_queue: Mutex<
+        VecDeque<(
+            i32,
+            Box<dyn Fn() -> Pin<Box<dyn Future<Output = Response> + Send>> + Send>,
+        )>,
+    >,
     results: Mutex<HashMap<i32, Response>>,
     notify: Arc<Notify>,
     semaphore: Arc<Semaphore>,
@@ -55,11 +62,16 @@ impl Scheduler {
         *shutdown_signal = 1;
     }
 
-    pub async fn add_task(self: &Arc<Self>, id: i32, t: JoinHandle<Response>) -> Arc<Notify> {
+    pub async fn add_task(
+        self: &Arc<Self>,
+        id: i32,
+        t: Box<dyn Fn() -> Pin<Box<dyn Future<Output = Response> + Send>> + Send>,
+    ) -> Arc<Notify> {
         if let Ok(permit) = self.semaphore.clone().try_acquire_owned() {
             let scheduler = Arc::clone(self);
             task::spawn(async move {
-                scheduler.store_result(id, t.await.unwrap()).await;
+                let result = t().await;
+                scheduler.store_result(id, result).await;
                 drop(permit);
             });
 
@@ -87,12 +99,12 @@ impl Scheduler {
             let available_slots = self.semaphore.available_permits();
 
             for _ in 0..available_slots {
-                if let Some((id, task)) = queue.pop_front() {
+                if let Some((id, t)) = queue.pop_front() {
                     if let Ok(permit) = self.semaphore.clone().try_acquire_owned() {
                         let scheduler = Arc::clone(self);
 
                         task::spawn(async move {
-                            let result = task.await.unwrap();
+                            let result = t().await;
                             scheduler.store_result(id, result).await;
                             drop(permit);
                         });

@@ -1,6 +1,8 @@
 use std::{env, sync::Arc};
 
+use client::Client;
 use futures::future::join_all;
+use scheduler::Scheduler;
 
 mod api;
 mod client;
@@ -8,17 +10,13 @@ mod common;
 mod scheduler;
 
 async fn simulate(client_calls: i32, client_retry: i32) {
-    let scheduler = Arc::new(scheduler::Scheduler::new(5));
     let api = Arc::new(api::API::new(5));
-
+    let scheduler = Arc::new(Scheduler::new(5));
+    scheduler.run();
     let mut tasks = vec![];
 
-    scheduler.run();
-
     for i in 0..client_calls {
-        tasks.push(
-            client::Client::new(client_retry, Arc::clone(&api), Arc::clone(&scheduler)).get(i),
-        );
+        tasks.push(Client::new(client_retry, Arc::clone(&api), Arc::clone(&scheduler)).get(i));
     }
 
     join_all(tasks).await;
