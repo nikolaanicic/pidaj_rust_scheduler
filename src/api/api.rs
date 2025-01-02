@@ -4,7 +4,7 @@ use crate::{
     common::{get_err_response, get_ok_response, Request, Response},
 };
 use rand::Rng;
-use std::{cmp::Ordering, sync::Arc, time};
+use std::{cmp::Ordering, sync::Arc, time::{self, SystemTime, UNIX_EPOCH}};
 use tokio::time::sleep;
 
 use tokio::sync::Mutex;
@@ -29,15 +29,15 @@ impl API {
         }
     }
 
-    async fn compute_time(&self, /*active_conns*/ _: i32) -> f32 {
+    async fn compute_time(&self, active_conns: i32) -> f32 {
         // let min_time = self.min_compute_time;
         // let max_time = self.max_compute_time;
-        // let mut rng = self.random_generator.lock().await;
-
-        return 0.250;
+        // let mut rng = thread_rng();
 
         // return (rng.gen_range(min_time..=max_time) as f32 * rng.gen::<f32>() / 100.0) / 10.0
         //     * std::cmp::max(active_conns, 1) as f32;
+
+        return 0.250;
     }
 
     async fn compute_response(&self, active_conns: i32) -> Response {
@@ -55,7 +55,12 @@ impl API {
         }
     }
 
-    pub async fn get(&self, _: &Request) -> Response {
+    pub async fn get(&self, request: &Request) -> Response {
+        match SystemTime::now().duration_since(UNIX_EPOCH) {
+            Ok(n) => println!("{}:{}:-1:server",request.id, n.as_millis()),
+            Err(_) => panic!("SystemTime before UNIX EPOCH!"),
+        };
+
         let conns;
         {
             let mut active_conns = self.current_connections.lock().await;
@@ -68,9 +73,15 @@ impl API {
         }
 
         let response = self.compute_response(conns).await;
-
-        let mut active_conns = self.current_connections.lock().await;
-        *active_conns -= 1;
+        
+        {
+            let mut active_conns = self.current_connections.lock().await;
+            *active_conns -= 1;
+        }
+        match SystemTime::now().duration_since(UNIX_EPOCH) {
+            Ok(n) => println!("{}:{}:1:server",request.id, n.as_millis()),
+            Err(_) => panic!("SystemTime before UNIX EPOCH!"),
+        };
 
         return response;
     }

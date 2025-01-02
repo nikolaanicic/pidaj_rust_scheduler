@@ -1,4 +1,4 @@
 /target
-flamegraph.pl
-*.py
 *perf*
+*flamegraph*
+*results*

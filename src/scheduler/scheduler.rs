@@ -1,9 +1,5 @@
 use std::{
-    collections::{HashMap, VecDeque},
-    future::Future,
-    pin::Pin,
-    sync::Arc,
-    time::Duration,
+    collections::{HashMap, VecDeque}, fmt, future::Future, pin::Pin, sync::Arc, time::Duration
 };
 
 use tokio::{
@@ -29,6 +25,13 @@ pub struct Scheduler {
     shutdown_signal: Mutex<i32>,
 }
 
+
+impl fmt::Debug for Scheduler {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Scheduler").finish()
+    }
+}
+
 impl Scheduler {
     pub fn new(max_tasks: usize) -> Arc<Self> {
         Arc::new(Self {
@@ -40,7 +43,6 @@ impl Scheduler {
             shutdown_signal: Mutex::new(0),
         })
     }
-
     async fn store_result(&self, id: i32, result: Response) {
         let mut map = self.results.lock().await;
         map.insert(id, result);

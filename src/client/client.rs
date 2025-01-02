@@ -1,9 +1,9 @@
 use std::{
     sync::Arc,
-    time::{self},
+    time::{self, Duration, SystemTime, UNIX_EPOCH},
 };
 
-use tokio::time::{sleep, Instant};
+use tokio::time::sleep;
 
 use crate::{
     api::API,
@@ -34,7 +34,10 @@ impl Client {
         let retry_time = self.get_retry_time();
         let api = Arc::clone(&self.api);
 
-        let start = Instant::now();
+        match SystemTime::now().duration_since(UNIX_EPOCH) {
+            Ok(n) => println!("{}:{}:-1:client",id, n.as_millis()),
+            Err(_) => panic!("SystemTime before UNIX EPOCH!"),
+        };
 
         self.scheduler
             .add_task(
@@ -54,13 +57,7 @@ impl Client {
             }
         };
         let mut tries = 1;
-        println!(
-            "{}: {} {} {}",
-            id,
-            response,
-            start.elapsed().as_secs_f32(),
-            tries
-        );
+
 
         while response.get_status() != StatusCode::OK {
             sleep(time::Duration::from_secs_f32(retry_time)).await;
@@ -80,19 +77,18 @@ impl Client {
 
             response = loop {
                 if let Some(res) = self.scheduler.get_result(id).await {
-                    break res;
+                    break res
                 }
-            };
-            tries += 1;
 
-            println!(
-                "{}: {} {} {}",
-                id,
-                response,
-                start.elapsed().as_secs_f32(),
-                tries
-            );
+                sleep(Duration::from_millis(10)).await;
+            };
+
+            tries += 1;
         }
+        match SystemTime::now().duration_since(UNIX_EPOCH) {
+            Ok(n) => println!("{}:{}:{}:client",id, n.as_millis(),tries),
+            Err(_) => panic!("SystemTime before UNIX EPOCH!"),
+        };
 
         response
     }

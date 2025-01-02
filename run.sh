@@ -4,10 +4,11 @@ cargo build
 mkdir -p results
 
 function call_benchmark(){
-	./target/debug/sem $1 $2 | python3 analyzer.py
+	cargo run -r $1 $2 | python3 analyzer.py
 }
 export -f call_benchmark
-client_calls=$(seq 50 50 300) 
-retry_times=$(seq 1 10 100) 
+client_calls=(5 10 15 20 25 30 50)
+retries=(1 5 10)
 
-parallel --group --tag --eta -- call_benchmark ::: $client_calls ::: $retry_times
+
+parallel --group --tag --eta 'call_benchmark {}' ::: "${client_calls[@]}" ::: "${retries[@]}"

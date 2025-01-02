@@ -2,7 +2,7 @@ use core::fmt;
 
 #[derive(Debug)]
 pub struct Request {
-    id: i32,
+    pub id: i32,
 }
 
 impl Request {
